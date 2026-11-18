@@ -34,13 +34,13 @@ def correct_lang_token(tokenizer, input_ids: torch.Tensor, token_length: torch.T
         if model_type == 'mbart_multi_part':
             src2id = {'how2sign': {'body': 'en_ASL', 'lhand': 'en_ASL_lhand', 'rhand': 'en_ASL_rhand'}, 
                     'csl': {'body': 'zh_CSL', 'lhand': 'zh_CSL_lhand', 'rhand': 'zh_CSL_rhand'},
-                    'phoenix': {'body': 'de_DGS', 'lhand': 'de_DGS_lhand', 'rhand': 'de_DGS_rhand'}}
+                    'lgk': {'body': 'lt_LGK', 'lhand': 'lt_LGK_lhand', 'rhand': 'lt_LGK_rhand'}, 'phoenix': {'body': 'de_DGS', 'lhand': 'de_DGS_lhand', 'rhand': 'de_DGS_rhand'}}
         else:
             src2id = {'how2sign': {'body': 'en_ASL', 'lhand': 'en_ASL', 'rhand': 'en_ASL'}, 
                     'csl': {'body': 'zh_CSL', 'lhand': 'zh_CSL', 'rhand': 'zh_CSL'},
-                    'phoenix': {'body': 'de_DGS', 'lhand': 'de_DGS', 'rhand': 'de_DGS'}}
+                    'lgk': {'body': 'lt_LGK', 'lhand': 'lt_LGK', 'rhand': 'lt_LGK'}, 'phoenix': {'body': 'de_DGS', 'lhand': 'de_DGS', 'rhand': 'de_DGS'}}
     else:
-        src2id = {'how2sign': 'en_XX', 'csl': 'zh_CN', 'phoenix': 'de_DE'}
+        src2id = {'how2sign': 'en_XX', 'csl': 'zh_CN', 'phoenix': 'de_DE', 'lgk': 'lt_LT'}
     for s in data_src:
         if target:
             token = src2id[s][part]
@@ -57,11 +57,11 @@ def make_decoder_input_ids(tokenizer, device, data_src, part, model_type='mbart_
     if model_type == 'mbart_multi_part':
         src2id = {'how2sign': {'body': 'en_ASL', 'lhand': 'en_ASL_lhand', 'rhand': 'en_ASL_rhand'}, 
                       'csl': {'body': 'zh_CSL', 'lhand': 'zh_CSL_lhand', 'rhand': 'zh_CSL_rhand'},
-                      'phoenix': {'body': 'de_DGS', 'lhand': 'de_DGS_lhand', 'rhand': 'de_DGS_rhand'}}
+                      'lgk': {'body': 'lt_LGK', 'lhand': 'lt_LGK_lhand', 'rhand': 'lt_LGK_rhand'}, 'phoenix': {'body': 'de_DGS', 'lhand': 'de_DGS_lhand', 'rhand': 'de_DGS_rhand'}}
     else:
         src2id = {'how2sign': {'body': 'en_ASL', 'lhand': 'en_ASL', 'rhand': 'en_ASL'}, 
                     'csl': {'body': 'zh_CSL', 'lhand': 'zh_CSL', 'rhand': 'zh_CSL'},
-                    'phoenix': {'body': 'de_DGS', 'lhand': 'de_DGS', 'rhand': 'de_DGS'}}
+                    'lgk': {'body': 'lt_LGK', 'lhand': 'lt_LGK', 'rhand': 'lt_LGK'}, 'phoenix': {'body': 'de_DGS', 'lhand': 'de_DGS', 'rhand': 'de_DGS'}}
     for s in data_src:
         lang_id = tokenizer.convert_tokens_to_ids(src2id[s][part])
         decoder_input_ids.append(lang_id)
@@ -116,16 +116,26 @@ class Mbart_Based_MLM(nn.Module):
             new_lang_token = ['en_ASL', 'en_ASL_lhand', 'en_ASL_rhand', 'zh_CSL', 'zh_CSL_lhand', 'zh_CSL_rhand', 'de_DGS', 'de_DGS_lhand', 'de_DGS_rhand']
         else:
             new_lang_token = ['en_ASL', 'zh_CSL', 'de_DGS']
+        self.lgk = bool(kwargs.get('lgk', False))
+        self.strict_text = self.lgk
+        if self.lgk:
+            new_lang_token += (['lt_LGK', 'lt_LGK_lhand', 'lt_LGK_rhand']
+                               if model_type == 'mbart_multi_part' else ['lt_LGK'])
         self.tokenizer.add_tokens(new_lang_token, special_tokens=True)
         all_motion_str = [f'<motion_id_{i}>' for i in range(self.m_codebook_size + 3)]
         all_hand_str = [f'<hand_id_{i}>' for i in range(self.hand_codebook_size + 3)] if hand_codebook_size>0 else []
         all_rhand_str = [f'<rhand_id_{i}>' for i in range(self.rhand_codebook_size + 3)] if rhand_codebook_size>0 else []
         self.tokenizer.add_tokens(all_motion_str + all_hand_str + all_rhand_str)
-        self.lang_token_ids = list(map(self.tokenizer.convert_tokens_to_ids, ['en_XX', 'zh_CN', 'de_DE', '<mask>']+new_lang_token))
+        self.lang_token_ids = list(map(self.tokenizer.convert_tokens_to_ids, ['en_XX', 'zh_CN', 'de_DE', '<mask>']+(['lt_LT'] if self.lgk else [])+new_lang_token))
 
         # set map ids
-        with open(os.path.join(model_path, 'map_ids.pkl'), 'rb') as f:
-            self.tok_id_to_emb_id = pickle.load(f)
+        if self.lgk:
+            if os.path.exists(os.path.join(model_path, 'map_ids.pkl')):
+                raise ValueError('LGK requires full mBART-cc25 assets, not the trimmed SOKE model')
+            self.tok_id_to_emb_id = {i: i for i in range(self.tokenizer.vocab_size)}
+        else:
+            with open(os.path.join(model_path, 'map_ids.pkl'), 'rb') as f:
+                self.tok_id_to_emb_id = pickle.load(f)
         idx = len(self.tok_id_to_emb_id)
         for tok in [*new_lang_token, *all_motion_str, *all_hand_str, *all_rhand_str]:
             tok_id = self.tokenizer.convert_tokens_to_ids(tok)
@@ -172,6 +182,9 @@ class Mbart_Based_MLM(nn.Module):
                                             ids_remove_rhand=ids_remove_rhand,
                                             eos_idx=self.eos_idx
                                         )
+        if kwargs.get('gradient_checkpointing', False):
+            self.language_model.main_lm.gradient_checkpointing_enable()
+            self.language_model.main_lm.config.use_cache = False
         self.lm_type = 'encdec'
         # elif model_type == "gpt2":
         #     self.language_model = GPT2LMHeadModel.from_pretrained(model_path)
@@ -182,16 +195,17 @@ class Mbart_Based_MLM(nn.Module):
         if self.lm_type == 'dec':
             self.tokenizer.pad_token = self.tokenizer.eos_token
         
-        self.num_kws_per_sen = 3 if self.model_type == 'mbart_multi' else 0
+        self.num_kws_per_sen = (3 if self.model_type == 'mbart_multi' else 0) if kwargs.get('retrieval', True) else 0
+        if self.lgk and self.num_kws_per_sen:
+            raise ValueError('LGK baseline requires retrieval=False')
         self.max_len_per_part = 10
-        self.name2kws = {}
-        for split in ['train', 'val', 'test']:
-            # load pre-extracted keywords
-            with open(f'scripts/name2kws_{split}.json', 'r') as f:
-                data = json.load(f)
-                self.name2kws.update(data)
-        with open('scripts/word2code.json', 'r') as f:
-            self.word2code = json.load(f)
+        self.name2kws, self.word2code = {}, {}
+        if self.num_kws_per_sen:
+            for split in ['train', 'val', 'test']:
+                with open(f'scripts/name2kws_{split}.json', encoding='utf-8') as f:
+                    self.name2kws.update(json.load(f))
+            with open('scripts/word2code.json', encoding='utf-8') as f:
+                self.word2code = json.load(f)
 
 
     def map_ids(self, input_ids: torch.Tensor, direction: str ='token_to_emb'):
@@ -207,8 +221,10 @@ class Mbart_Based_MLM(nn.Module):
             for j in range(N):
                 try:
                     input_ids[i][j] = mapping[input_ids[i][j].item()]
-                except:
-                    input_ids[i][j] = unk_idx
+                except KeyError:
+                    if self.strict_text and input_ids[i][j].item() != -100:
+                        raise ValueError(f'Unmapped LGK token: {input_ids[i][j].item()}')
+                    input_ids[i][j] = -100 if input_ids[i][j].item() == -100 else mapping.get(unk_idx, unk_idx)
 
 
     def get_kw_strings(self, name, src):
@@ -353,7 +369,7 @@ class Mbart_Based_MLM(nn.Module):
         lables_attention_mask = target_inputs.attention_mask.to(motion_tokens.device)
         token_len = target_inputs.length.to(motion_tokens.device)
         correct_lang_token(self.tokenizer, labels_input_ids, token_len, src, part='body', target=True, model_type=self.model_type)
-        labels_input_ids[labels_input_ids == 0] = -100
+        labels_input_ids[labels_input_ids == self.tokenizer.pad_token_id] = -100
         self.map_ids(labels_input_ids, direction='token_to_emb')
         # print('labels: ', labels_input_ids)
 
@@ -371,7 +387,7 @@ class Mbart_Based_MLM(nn.Module):
             labels_input_ids_hand = target_inputs_hand.input_ids.to(motion_tokens.device)
             token_len = target_inputs_hand.length.to(motion_tokens.device)
             correct_lang_token(self.tokenizer, labels_input_ids_hand, token_len, src, part='lhand', target=True, model_type=self.model_type)
-            labels_input_ids_hand[labels_input_ids_hand==0] = -100
+            labels_input_ids_hand[labels_input_ids_hand==self.tokenizer.pad_token_id] = -100
             self.map_ids(labels_input_ids_hand, direction='token_to_emb')
             # print('labels hand: ', labels_input_ids_hand)
 
@@ -388,7 +404,7 @@ class Mbart_Based_MLM(nn.Module):
             labels_input_ids_rhand = target_inputs_rhand.input_ids.to(motion_tokens.device)
             token_len = target_inputs_rhand.length.to(motion_tokens.device)
             correct_lang_token(self.tokenizer, labels_input_ids_rhand, token_len, src, part='rhand', target=True, model_type=self.model_type)
-            labels_input_ids_rhand[labels_input_ids_rhand==0] = -100
+            labels_input_ids_rhand[labels_input_ids_rhand==self.tokenizer.pad_token_id] = -100
             self.map_ids(labels_input_ids_rhand, direction='token_to_emb')
             # print('labels rhand: ', labels_input_ids_rhand)
 

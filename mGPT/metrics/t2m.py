@@ -81,6 +81,12 @@ class TM2TMetrics(Metric):
                            "csl_DTW_MPJPE_PA_lhand", "csl_DTW_MPJPE_PA_rhand", "csl_DTW_MPJPE_PA_body",
                            "phoenix_DTW_MPJPE_PA_lhand", "phoenix_DTW_MPJPE_PA_rhand", "phoenix_DTW_MPJPE_PA_body"]
 
+        if cfg.DATASET.H2S.DATASET_NAME == "lgk":
+            self.add_state("lgk_count_seq", default=torch.tensor(0), dist_reduce_fx="sum")
+            self.MR_metrics = [f"lgk_DTW_MPJPE_PA_{part}" for part in ("body", "lhand", "rhand")]
+            for key in self.MR_metrics:
+                self.add_state(key, default=torch.tensor([0.0]), dist_reduce_fx="sum")
+
         # All metric
         self.metrics = self.MR_metrics
 

@@ -52,7 +52,10 @@ def main():
     trainer = pl.Trainer(
         default_root_dir=cfg.FOLDER_EXP,
         max_epochs=cfg.TRAIN.END_EPOCH,
-        # precision='16',
+        precision=cfg.PRECISION or '32-true',
+        accumulate_grad_batches=cfg.TRAIN.get('ACCUMULATE_GRAD_BATCHES', 1),
+        gradient_clip_val=cfg.TRAIN.get('GRADIENT_CLIP_VAL', 0.0),
+        fast_dev_run=cfg.TRAIN.get('FAST_DEV_RUN', False),
         logger=pl_loggers,
         callbacks=callbacks,
         check_val_every_n_epoch=cfg.LOGGER.VAL_EVERY_STEPS,

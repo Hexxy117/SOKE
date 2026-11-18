@@ -190,6 +190,12 @@ def getCheckpointCallback(cfg, logger=None, **kwargs):
     #     'save_top_k': 1,
     # })
 
+    if cfg.DATASET.H2S.DATASET_NAME == 'lgk':
+        metric_monitor_map['TM2TMetrics'] = {
+            'Metrics/lgk_DTW_MPJPE_PA_lhand': {'abbr': 'lgk_hand', 'mode': 'min'}}
+        for part in ('body', 'lhand', 'rhand'):
+            metric_monitor[f'lgk_DTW_MPJPE_PA_{part}'] = f'Metrics/lgk_DTW_MPJPE_PA_{part}'
+
     for metric in metrics:
         if metric in metric_monitor_map.keys():
             metric_monitors = metric_monitor_map[metric]

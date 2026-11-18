@@ -60,8 +60,8 @@ class BASEDataModule(pl.LightningDataModule):
         dataloader_options["num_workers"] = self.cfg.TRAIN.NUM_WORKERS
         return DataLoader(
             self.train_dataset,
-            shuffle=False,
-            persistent_workers=True,
+            shuffle=self.cfg.DATASET.get("H2S", {}).get("DATASET_NAME") == "lgk",
+            persistent_workers=dataloader_options["num_workers"] > 0,
             **dataloader_options,
         )
 
@@ -73,7 +73,7 @@ class BASEDataModule(pl.LightningDataModule):
         dataloader_options["shuffle"] = False
         return DataLoader(
             self.test_dataset,
-            persistent_workers=True,
+            persistent_workers=dataloader_options["num_workers"] > 0,
             **dataloader_options,
         )
 
@@ -85,7 +85,7 @@ class BASEDataModule(pl.LightningDataModule):
         dataloader_options["shuffle"] = False
         return DataLoader(
             self.val_dataset,
-            persistent_workers=True,
+            persistent_workers=dataloader_options["num_workers"] > 0,
             **dataloader_options,
         )
 
@@ -98,6 +98,6 @@ class BASEDataModule(pl.LightningDataModule):
         dataloader_options["shuffle"] = False
         return DataLoader(
             self.test_dataset,
-            persistent_workers=True,
+            persistent_workers=dataloader_options["num_workers"] > 0,
             **dataloader_options,
         )

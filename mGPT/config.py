@@ -99,6 +99,9 @@ def parse_args(phase="train"):
                            default='2,3,4,5,6,7',
                            help="cuda environ devices")
     
+    if phase == "train":
+        group.add_argument("--fast_dev_run", action="store_true", help="One training and validation batch")
+
     # Parse for each phase
     if phase in ["train", "test"]:
         group.add_argument("--batch_size",
@@ -185,6 +188,8 @@ def parse_args(phase="train"):
     cfg = OmegaConf.merge(cfg_exp, cfg_assets)
 
     cfg.USE_GPUS = params.use_gpus
+    if phase == "train":
+        cfg.TRAIN.FAST_DEV_RUN = params.fast_dev_run
     # Update config with arguments
     if phase in ["train", "test"]:
         cfg.TRAIN.BATCH_SIZE = params.batch_size if params.batch_size else cfg.TRAIN.BATCH_SIZE
