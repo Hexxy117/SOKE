@@ -49,7 +49,7 @@ class BaseModel(LightningModule):
         ref_len = outputs['lengths']
         rst_len = outputs['lengths_rst']
         try:
-            save_dir = os.path.join(self.output_dir, f'{self.hparams.cfg.TEST.SPLIT}_rank_'+str(torch.distributed.get_rank()))
+            save_dir = os.path.join(self.output_dir, f'{self.hparams.cfg.TEST.SPLIT}_rank_'+str((torch.distributed.get_rank() if torch.distributed.is_initialized() else 0)))
         except:
             save_dir = os.path.join(self.output_dir, f'{self.hparams.cfg.TEST.SPLIT}_rank_0')
         os.makedirs(save_dir, exist_ok=True)
@@ -101,6 +101,8 @@ class BaseModel(LightningModule):
             metrics = ["how2sign_DTW_MPJPE_PA_lhand", "how2sign_DTW_MPJPE_PA_rhand", "how2sign_DTW_MPJPE_PA_body", 
                            "csl_DTW_MPJPE_PA_lhand", "csl_DTW_MPJPE_PA_rhand", "csl_DTW_MPJPE_PA_body",
                            "phoenix_DTW_MPJPE_PA_lhand", "phoenix_DTW_MPJPE_PA_rhand", "phoenix_DTW_MPJPE_PA_body"]
+            if self.hparams.cfg.DATASET.H2S.DATASET_NAME == "lgk":
+                metrics = [f"lgk_DTW_MPJPE_PA_{p}" for p in ("body", "lhand", "rhand")]
             scores, count = {}, {}
             for m in metrics:
                 scores[m] = count[m] = 0
@@ -110,7 +112,7 @@ class BaseModel(LightningModule):
                     count[n] = count[n] + 1
             for k in scores.keys():
                 scores[k] = scores[k] / max(count[k], 1)
-            print('rank: ', torch.distributed.get_rank(), scores)
+            print('rank: ', (torch.distributed.get_rank() if torch.distributed.is_initialized() else 0), scores)
 
         # Log metrics
         dico = self.metrics_log_dict()
@@ -120,7 +122,7 @@ class BaseModel(LightningModule):
         # self.save_npy(self.test_step_outputs)
 
         # save prediction
-        save_dir = os.path.join(self.output_dir, f'{self.hparams.cfg.TEST.SPLIT}_rank_'+str(torch.distributed.get_rank()))
+        save_dir = os.path.join(self.output_dir, f'{self.hparams.cfg.TEST.SPLIT}_rank_'+str((torch.distributed.get_rank() if torch.distributed.is_initialized() else 0)))
         os.makedirs(save_dir, exist_ok=True)
         if 'lm' in self.hparams.stage:
             with open(os.path.join(save_dir, 'test_scores.json'), 'w') as f:

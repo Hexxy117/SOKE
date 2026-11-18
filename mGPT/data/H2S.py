@@ -47,8 +47,12 @@ class H2SDataModule(BASEDataModule):
         std_path = cfg.DATASET.H2S.STD_PATH
         print('mean path', mean_path, 'std_path: ', std_path)
 
-        self.hparams.mean = torch.load(mean_path)
-        self.hparams.std = torch.load(std_path)
+        self.hparams.mean = torch.load(mean_path, map_location="cpu", weights_only=True)
+        self.hparams.std = torch.load(std_path, map_location="cpu", weights_only=True)
+        if self.hparams.mean.numel() != 179 or self.hparams.std.numel() != 179:
+            raise ValueError("Expected original 179-D SOKE normalization statistics")
+        if not torch.isfinite(self.hparams.mean).all() or not torch.isfinite(self.hparams.std).all() or (self.hparams.std < 0).any():
+            raise ValueError("Invalid SOKE normalization statistics")
         # filter out unwanted joints
         self.hparams.mean = self.hparams.mean[(3+3*11):]
         self.hparams.mean = torch.cat([self.hparams.mean[:-20], self.hparams.mean[-10:]], dim=0)
@@ -71,8 +75,8 @@ class H2SDataModule(BASEDataModule):
         # Additional parameters
         self.hparams.debug = cfg.DEBUG
         self.hparams.stage = cfg.TRAIN.STAGE
-        self.hparams.w_vectorizer = WordVectorizer(
-            cfg.DATASET.WORD_VERTILIZER_PATH, "our_vab")
+        self.hparams.w_vectorizer = (None if self.hparams.dataset_name == "lgk" else WordVectorizer(
+            cfg.DATASET.WORD_VERTILIZER_PATH, "our_vab"))
 
         # Dataset switch
         self.DatasetEval = H2SMotionDatasetVQ if cfg.TRAIN.STAGE in ["vae"] else Text2MotionDatasetEval

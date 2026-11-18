@@ -43,14 +43,23 @@ def load_pretrained_vae(cfg, model, logger=None):
     
     if hasattr(model, 'rhand_vae'):
         print('load rhand vae...')
-        neq_load_customized(model.rhand_vae, rhand_vae_dict, verbose=True)
+        if cfg.DATASET.H2S.DATASET_NAME == 'lgk':
+            model.rhand_vae.load_state_dict(rhand_vae_dict, strict=True)
+        else:
+            neq_load_customized(model.rhand_vae, rhand_vae_dict, verbose=True)
     if hasattr(model, 'hand_vae'):
         print('load hand vae...')
-        neq_load_customized(model.hand_vae, hand_vae_dict, verbose=True)
+        if cfg.DATASET.H2S.DATASET_NAME == 'lgk':
+            model.hand_vae.load_state_dict(hand_vae_dict, strict=True)
+        else:
+            neq_load_customized(model.hand_vae, hand_vae_dict, verbose=True)
     if hasattr(model, 'vae'):
         print('load vae...')
         # model.vae.load_state_dict(vae_dict, strict=True)
-        neq_load_customized(model.vae, vae_dict, verbose=True)
+        if cfg.DATASET.H2S.DATASET_NAME == 'lgk':
+            model.vae.load_state_dict(vae_dict, strict=True)
+        else:
+            neq_load_customized(model.vae, vae_dict, verbose=True)
     else:
         # model.motion_vae.load_state_dict(vae_dict, strict=True)
         neq_load_customized(model.motion_vae, vae_dict, verbose=True)
